@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use \PHRETS\Configuration;
 use \PHRETS\Session;
 use App\Residential;
+use App\Media;
 
 class retsUpdate extends Command
 {
@@ -56,7 +57,7 @@ class retsUpdate extends Command
 
         foreach ($property_classes as $pc) {
 
-            $query = "(OnMarketDate=2019-10-20+)";
+            $query = "(OnMarketDate=2019-10-21+)";
 
             $results = $rets->Search('Property', $pc, $query);
 
@@ -72,7 +73,7 @@ class retsUpdate extends Command
 
                     foreach ($data as $key => $value) {
 
-                        if (empty($value)) continue;
+                        if (is_null($value) || trim($value) === '') continue;
 
                         $collection[$header[$key]] = $value;
 
@@ -89,6 +90,8 @@ class retsUpdate extends Command
 
         }
 
+        $this->getMedia($rets);
+
     }
 
     private function setConfiguration($config) {
@@ -98,6 +101,32 @@ class retsUpdate extends Command
                                 ->setPassword(env('RETS_PASSWORD'))
                                 ->setRetsVersion(env('RETS_VERSION'));
 
+    }
+
+    private function getMedia($rets) {
+
+        Media::truncate();
+
+        $listingkeys = Residential::all(['listingkeynumeric']);
+
+        foreach ($listingkeys as $listingkey) {
+
+            $query = "(ResourceRecordKeyNumeric=$listingkey->listingkeynumeric)";
+
+            $results = $rets->Search('Media', 'Media', $query);
+
+            foreach ($results->toArray() as $result) {
+
+                $result = array_filter($result, function($value) {
+                    return !is_null($value) && trim($value) !== '';
+                });
+
+                $result = array_change_key_case($result,CASE_LOWER);
+
+                Media::insert($result);
+
+            }
+        }
     }
 
 }
